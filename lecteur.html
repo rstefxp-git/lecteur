@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lecteur</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#14161a">
+<style>
+:root{color-scheme:dark;--bg:#14161a;--card:#1d2127;--fg:#e9e7e2;--mut:#8d939c;--ac:#8ec5ff;--r:6px}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--bg);border-bottom:1px solid #262b32}
+header input[type=search]{flex:1;min-width:0;background:var(--card);border:1px solid #2c323a;color:var(--fg);padding:8px 12px;border-radius:var(--r);font:inherit}
+button,.btn{background:var(--card);border:1px solid #2c323a;color:var(--fg);padding:8px 12px;border-radius:var(--r);font:inherit;cursor:pointer;white-space:nowrap}
+button:hover,.btn:hover{border-color:var(--ac)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+#info{padding:10px 14px;color:var(--mut);font-size:13px;display:flex;gap:10px;align-items:center;min-height:42px}
+#info button{padding:2px 8px;font-size:12px}
+#p{max-width:1000px;margin:0 auto;padding:14px 14px 0}
+#p[hidden]{display:none}
+.vid{aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden}
+.vid iframe{width:100%;height:100%;border:0;display:block}
+.bar{display:flex;gap:8px;align-items:center;padding:10px 0}
+.bar h2{flex:1;font-size:16px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar a{color:var(--ac);font-size:13px;white-space:nowrap}
+#g{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px 12px;padding:0 14px 40px}
+.card{cursor:pointer;min-width:0}
+.card img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--card);border-radius:var(--r);display:block}
+.card.on img{outline:2px solid var(--ac)}
+.card h3{font-size:14px;font-weight:500;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card p{font-size:12px;color:var(--mut);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch:hover{color:var(--ac);text-decoration:underline}
+#vide{max-width:460px;margin:12vh auto;padding:0 20px;text-align:center;color:var(--mut)}
+#vide[hidden]{display:none}
+#vide b{display:block;color:var(--fg);font-size:18px;margin-bottom:8px}
+body.drag{outline:2px dashed var(--ac);outline-offset:-8px}
+</style>
+</head>
+<body>
+<header>
+  <input id="q" type="search" placeholder="Rechercher titre ou chaîne" autocomplete="off">
+  <button id="s" title="Changer le tri">Récents</button>
+  <label class="btn" for="f">Importer</label>
+  <input id="f" type="file" accept=".json,application/json" multiple hidden>
+</header>
+
+<section id="p" hidden>
+  <div class="vid"><iframe id="v" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+  <div class="bar">
+    <button id="pr" title="Précédente (←)">◀</button>
+    <button id="nx" title="Suivante (→)">▶</button>
+    <h2 id="pt"></h2>
+    <a id="yt" target="_blank" rel="noopener">Ouvrir sur YouTube</a>
+    <button id="x" title="Fermer (Échap)">✕</button>
+  </div>
+</section>
+
+<div id="info"></div>
+<main id="g"></main>
+<div id="end"></div>
+
+<div id="vide">
+  <b>Dépose ton fichier d'historique</b>
+  Google Takeout → YouTube → historique, format JSON.<br>
+  Fichier : <code>watch-history.json</code>. Il est gardé dans ce navigateur après import.
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let all=[],view=[],shown=0,cur=-1,sort='recent',chan='';
+const STEP=60;
+
+/* stockage local */
+const idb=()=>new Promise((ok,ko)=>{const r=indexedDB.open('lecteur',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)});
+async function save(v){try{const d=await idb();d.transaction('k','readwrite').objectStore('k').put(v,'items')}catch{}}
+async function load(){try{const d=await idb();return await new Promise(ok=>{const q=d.transaction('k').objectStore('k').get('items');q.onsuccess=()=>ok(q.result);q.onerror=()=>ok()})}catch{}}
+
+/* import Takeout */
+function parse(arr,m){
+  for(const e of arr){
+    const x=(e.titleUrl||'').match(/[?&]v=([\w-]{11})/);if(!x)continue;
+    const id=x[1],ts=Date.parse(e.time)||0;
+    let t=(e.title||'').replace(/^(Watched|Vous avez regardé|Viewed)\s+/i,'');
+    if(/^https?:\/\//.test(t))t='';
+    const c=(e.subtitles&&e.subtitles[0]&&e.subtitles[0].name)||'';
+    const o=m.get(id);
+    if(o){o.n++;if(ts>o.d)o.d=ts;if(!o.t&&t)o.t=t;if(!o.c&&c)o.c=c}
+    else m.set(id,{id,t,c,d:ts,n:1});
+  }
+}
+async function importer(files){
+  const m=new Map();
+  for(const f of files){
+    try{const j=JSON.parse(await f.text());if(Array.isArray(j))parse(j,m)}catch{alert('Fichier illisible : '+f.name)}
+  }
+  if(!m.size){alert('Aucune vidéo trouvée. Format attendu : watch-history.json');return}
+  all=[...m.values()];chan='';save(all);apply();
+}
+
+/* liste */
+function apply(){
+  const q=$('#q').value.trim().toLowerCase();
+  view=all.filter(i=>(!chan||i.c===chan)&&(!q||(i.t+' '+i.c).toLowerCase().includes(q)));
+  view.sort(sort==='recent'?(a,b)=>b.d-a.d:(a,b)=>b.n-a.n||b.d-a.d);
+  $('#g').innerHTML='';shown=0;cur=-1;more();
+  $('#vide').hidden=all.length>0;
+  const i=$('#info');
+  i.innerHTML=all.length?esc(view.length+' vidéos')+(chan?' · '+esc(chan)+' <button id="rc">✕ chaîne</button>':''):'';
+}
+function more(){
+  if(shown>=view.length)return;
+  let h='';
+  for(let i=shown;i<Math.min(shown+STEP,view.length);i++){
+    const v=view[i];
+    h+=`<article class="card${i===cur?' on':''}" data-i="${i}"><img loading="lazy" src="https://i.ytimg.com/vi/${v.id}/mqdefault.jpg" alt=""><h3>${esc(v.t||'Vidéo '+v.id)}</h3><p>${v.c?`<span class="ch" data-c="${esc(v.c)}">${esc(v.c)}</span> · `:''}${v.d?new Date(v.d).toLocaleDateString('fr-FR'):''}${v.n>1?' · ×'+v.n:''}</p></article>`;
+  }
+  shown=Math.min(shown+STEP,view.length);
+  $('#g').insertAdjacentHTML('beforeend',h);
+}
+new IntersectionObserver(e=>{if(e[0].isIntersecting)more()},{rootMargin:'600px'}).observe($('#end'));
+
+/* lecture */
+function play(i){
+  if(i<0||i>=view.length)return;
+  while(i>=shown)more();
+  cur=i;const v=view[i];
+  $('#p').hidden=false;
+  $('#v').src=`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&enablejsapi=1`;
+  $('#pt').textContent=v.t||'Vidéo '+v.id;
+  $('#yt').href='https://www.youtube.com/watch?v='+v.id;
+  document.querySelectorAll('.card.on').forEach(c=>c.classList.remove('on'));
+  const c=$(`.card[data-i="${i}"]`);if(c)c.classList.add('on');
+  scrollTo({top:0,behavior:'smooth'});
+}
+function stop(){$('#v').src='about:blank';$('#p').hidden=true}
+$('#v').addEventListener('load',()=>{try{$('#v').contentWindow.postMessage(JSON.stringify({event:'listening',id:1}),'*')}catch{}});
+addEventListener('message',e=>{
+  if(!/youtube/.test(e.origin))return;
+  try{const d=JSON.parse(e.data);if(d.event==='onStateChange'&&d.info===0)play(cur+1)}catch{}
+});
+
+/* événements */
+$('#g').addEventListener('click',e=>{
+  const ch=e.target.closest('.ch');
+  if(ch){chan=ch.dataset.c;apply();scrollTo(0,0);return}
+  const c=e.target.closest('.card');if(c)play(+c.dataset.i);
+});
+$('#info').addEventListener('click',e=>{if(e.target.id==='rc'){chan='';apply()}});
+$('#q').addEventListener('input',apply);
+$('#s').addEventListener('click',()=>{sort=sort==='recent'?'vus':'recent';$('#s').textContent=sort==='recent'?'Récents':'Plus vus';apply()});
+$('#f').addEventListener('change',e=>{if(e.target.files.length)importer([...e.target.files]);e.target.value=''});
+$('#pr').addEventListener('click',()=>play(cur-1));
+$('#nx').addEventListener('click',()=>play(cur+1));
+$('#x').addEventListener('click',stop);
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='Escape')stop();
+  else if(e.key==='ArrowRight'&&cur>=0)play(cur+1);
+  else if(e.key==='ArrowLeft'&&cur>0)play(cur-1);
+});
+['dragenter','dragover'].forEach(t=>addEventListener(t,e=>{e.preventDefault();document.body.classList.add('drag')}));
+['dragleave','drop'].forEach(t=>addEventListener(t,e=>{e.preventDefault();document.body.classList.remove('drag')}));
+addEventListener('drop',e=>{if(e.dataTransfer.files.length)importer([...e.dataTransfer.files])});
+
+if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+(async()=>{const s=await load();if(s&&s.length)all=s;apply()})();
+</script>
+</body>
+</html>
