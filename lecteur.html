@@ -153,7 +153,7 @@ function closeMenu(){
 }
 function play(i,start){
   if(i<0||i>=view.length)return;
-  cur=i;const v=view[i];curId=v.id;st=-1;tcur=0;tdur=0;bgMeta(v);
+  cur=i;const v=view[i];curId=v.id;st=-1;tcur=0;tdur=0;bgMeta(v);if(!start)bgState(true);
   try{localStorage.setItem('last',v.id)}catch{}
   if(ready&&!start){cmd('loadVideoById',[v.id]);poster(v.id)}   /* lecteur déjà chargé : changement quasi instantané */
   else{ready=false;$('#v').src=`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=${start?0:1}&rel=0&playsinline=1&enablejsapi=1${/^https?:/.test(location.protocol)?'&origin='+encodeURIComponent(location.origin):''}`}

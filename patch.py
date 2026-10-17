@@ -323,6 +323,16 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private boolean linked = false;
+    private boolean told = false;
+
+    private void toast(final String m) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(MainActivity.this, m, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -342,12 +352,7 @@ public class MainActivity extends BridgeActivity {
                 public void meta(String title, String channel, String id) {
                     if (!linked) {
                         linked = true;
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(MainActivity.this, "Lecteur : liaison OK", Toast.LENGTH_SHORT).show();
-                            }
-                        });
+                        toast("Lecteur : liaison OK");
                     }
                     KeepAliveService.setMeta(title, channel, id);
                 }
@@ -358,6 +363,10 @@ public class MainActivity extends BridgeActivity {
                     KeepAliveService.posMs = (long) (pos * 1000);
                     KeepAliveService.durMs = (long) (dur * 1000);
                     if (playing) {
+                        if (!told) {
+                            told = true;
+                            toast("Lecteur : lecture signalée");
+                        }
                         ensureService();
                     }
                     KeepAliveService s = KeepAliveService.inst;
@@ -381,7 +390,7 @@ public class MainActivity extends BridgeActivity {
                 startService(i);
             }
         } catch (Exception e) {
-            // jamais bloquant
+            toast("Lecteur : démarrage refusé : " + e);
         }
     }
 
