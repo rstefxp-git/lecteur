@@ -26,8 +26,10 @@ button:hover,.btn:hover{border-color:var(--ac)}
 #ov iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 #po{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:1;pointer-events:none}
 #po[hidden]{display:none}
-@media (orientation:landscape){#sw{top:48px!important;bottom:20%!important}}
-#sw{position:absolute;inset:64px 0 22% 0;z-index:2;touch-action:none}
+@media (orientation:landscape){.sw{top:48px!important;bottom:20%!important}}
+.sw{position:absolute;top:64px;bottom:22%;width:24%;z-index:2;touch-action:none}
+#swl{left:0}
+#swr{right:0}
 #g{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px 12px;padding:0 14px 40px}
 .card{cursor:pointer;min-width:0}
 .card img{width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--card);border-radius:var(--r);display:block}
@@ -45,7 +47,8 @@ body.drag{outline:2px dashed var(--ac);outline-offset:-8px}
 <div id="ov">
   <iframe id="v" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
   <img id="po" alt="" hidden>
-  <div id="sw"></div>
+  <div class="sw" id="swl"></div>
+  <div class="sw" id="swr"></div>
 </div>
 
 
@@ -156,20 +159,17 @@ addEventListener('message',e=>{
 });
 addEventListener('popstate',()=>{if(menuOpen){menuOpen=false;menu.classList.add('out')}});
 
-/* gestes sur la vidéo : haut = suivante, bas = précédente, droite = menu ; tap = pause/lecture
-   (haut et bas de la vidéo laissés libres : sous-titres, réglages, barre YouTube) */
+/* gestes sur les bords gauche/droit de la vidéo : haut = suivante, bas = précédente, droite = menu
+   (centre, haut et bas laissés à YouTube : tap, barre de lecture, sous-titres, réglages) */
 let sx=0,sy=0,moved=false;
-const sw=$('#sw');
-sw.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY;moved=false});
-sw.addEventListener('pointerup',e=>{
-  const dx=e.clientX-sx,dy=e.clientY-sy,ax=Math.abs(dx),ay=Math.abs(dy);
-  if(ax>60&&ax>1.5*ay){moved=true;if(dx>0)openMenu()}
-  else if(ay>60&&ay>1.5*ax){moved=true;play(cur+(dy<0?1:-1))}
-});
-sw.addEventListener('click',()=>{
-  if(moved){moved=false;return}
-  if(menuOpen){closeMenu();return}
-  cmd(st===1?'pauseVideo':'playVideo');
+document.querySelectorAll('.sw').forEach(sw=>{
+  sw.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY;moved=false});
+  sw.addEventListener('pointerup',e=>{
+    const dx=e.clientX-sx,dy=e.clientY-sy,ax=Math.abs(dx),ay=Math.abs(dy);
+    if(ax>60&&ax>1.5*ay){moved=true;if(dx>0)openMenu()}
+    else if(ay>60&&ay>1.5*ax){moved=true;play(cur+(dy<0?1:-1))}
+  });
+  sw.addEventListener('click',()=>{if(moved){moved=false;return}if(menuOpen)closeMenu()});
 });
 /* geste sur le menu : gauche = ranger */
 let mx=0,my=0;
