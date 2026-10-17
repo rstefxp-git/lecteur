@@ -24,6 +24,9 @@ button:hover,.btn:hover{border-color:var(--ac)}
 #menu{position:fixed;top:0;left:0;bottom:0;width:min(100vw,720px);z-index:30;background:var(--bg);overflow:auto;overscroll-behavior:contain;box-shadow:0 0 40px #000a;transition:transform .22s ease,visibility 0s}
 #menu.out{transform:translateX(-102%);visibility:hidden;transition:transform .22s ease,visibility 0s .22s}
 #ov iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#po{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:1;pointer-events:none}
+#po[hidden]{display:none}
+@media (orientation:landscape){#sw{top:48px!important;bottom:20%!important}}
 #sw{position:absolute;inset:64px 0 22% 0;z-index:2;touch-action:none}
 #g{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px 12px;padding:0 14px 40px}
 .card{cursor:pointer;min-width:0}
@@ -40,7 +43,8 @@ body.drag{outline:2px dashed var(--ac);outline-offset:-8px}
 </head>
 <body>
 <div id="ov">
-  <iframe id="v" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  <iframe id="v" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  <img id="po" alt="" hidden>
   <div id="sw"></div>
 </div>
 
@@ -121,9 +125,10 @@ function more(){
 new IntersectionObserver(e=>{if(e[0].isIntersecting)more()},{root:$('#menu'),rootMargin:'600px'}).observe($('#end'));
 
 /* lecture */
-let st=-1,menuOpen=false;
+let st=-1,menuOpen=false,ready=false,posterT;
 const menu=$('#menu');
-function cmd(f){try{$('#v').contentWindow.postMessage(JSON.stringify({event:'command',func:f,args:[]}),'*')}catch{}}
+function cmd(f,a){try{$('#v').contentWindow.postMessage(JSON.stringify({event:'command',func:f,args:a||[]}),'*')}catch{}}
+function poster(id){const p=$('#po');p.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';p.hidden=false;clearTimeout(posterT);posterT=setTimeout(()=>{p.hidden=true},4000)}
 function openMenu(){
   if(menuOpen)return;menuOpen=true;menu.classList.remove('out');history.pushState({m:1},'');
   const c=$('.card.on');if(c)c.scrollIntoView({block:'center'});
@@ -136,7 +141,8 @@ function play(i,start){
   if(i<0||i>=view.length)return;
   cur=i;const v=view[i];curId=v.id;st=-1;
   try{localStorage.setItem('last',v.id)}catch{}
-  $('#v').src=`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=${start?0:1}&rel=0&playsinline=1&enablejsapi=1`;
+  if(ready&&!start){cmd('loadVideoById',[v.id]);poster(v.id)}   /* lecteur déjà chargé : changement quasi instantané */
+  else{ready=false;$('#v').src=`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=${start?0:1}&rel=0&playsinline=1&enablejsapi=1`}
   document.querySelectorAll('.card.on').forEach(c=>c.classList.remove('on'));
   const c=$(`.card[data-i="${i}"]`);if(c)c.classList.add('on');
   $('#mc').hidden=false;
@@ -146,7 +152,7 @@ function play(i,start){
 $('#v').addEventListener('load',()=>{try{$('#v').contentWindow.postMessage(JSON.stringify({event:'listening',id:1}),'*')}catch{}});
 addEventListener('message',e=>{
   if(!/youtube/.test(e.origin))return;
-  try{const d=JSON.parse(e.data);if(d.event==='onStateChange'){st=d.info;if(st===0)play(cur+1)}}catch{}
+  try{const d=JSON.parse(e.data);ready=true;if(d.event==='onStateChange'){st=d.info;if(st===1)$('#po').hidden=true;if(st===0)play(cur+1)}}catch{}
 });
 addEventListener('popstate',()=>{if(menuOpen){menuOpen=false;menu.classList.add('out')}});
 
