@@ -108,8 +108,6 @@ public class KeepAliveService extends Service {
         String a = intent != null ? intent.getAction() : null;
         if (a != null) {
             command(a);
-        } else {
-            toast("Lecteur : service démarré");
         }
         update();
         return START_NOT_STICKY;
@@ -322,8 +320,6 @@ import android.widget.Toast;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    private boolean linked = false;
-    private boolean told = false;
 
     private void toast(final String m) {
         runOnUiThread(new Runnable() {
@@ -350,10 +346,6 @@ public class MainActivity extends BridgeActivity {
             getBridge().getWebView().addJavascriptInterface(new Object() {
                 @JavascriptInterface
                 public void meta(String title, String channel, String id) {
-                    if (!linked) {
-                        linked = true;
-                        toast("Lecteur : liaison OK");
-                    }
                     KeepAliveService.setMeta(title, channel, id);
                 }
 
@@ -363,10 +355,6 @@ public class MainActivity extends BridgeActivity {
                     KeepAliveService.posMs = (long) (pos * 1000);
                     KeepAliveService.durMs = (long) (dur * 1000);
                     if (playing) {
-                        if (!told) {
-                            told = true;
-                            toast("Lecteur : lecture signalée");
-                        }
                         ensureService();
                     }
                     KeepAliveService s = KeepAliveService.inst;
