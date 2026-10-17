@@ -22,6 +22,7 @@ jobs:
           npx cap init Lecteur io.github.rstefxp.lecteur --web-dir www
           npx cap add android
           npx cap sync android
+          python3 patch.py
       - name: Compiler
         run: cd android && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
