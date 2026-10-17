@@ -41,6 +41,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.webkit.WebView;
+import android.widget.Toast;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -107,6 +108,8 @@ public class KeepAliveService extends Service {
         String a = intent != null ? intent.getAction() : null;
         if (a != null) {
             command(a);
+        } else {
+            toast("Lecteur : service démarré");
         }
         update();
         return START_NOT_STICKY;
@@ -184,8 +187,26 @@ public class KeepAliveService extends Service {
         });
     }
 
+    void toast(final String m) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(getApplicationContext(), m, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     // ---- session + notification ----
     private void update() {
+        try {
+            doUpdate();
+        } catch (Throwable t) {
+            toast("Lecteur : erreur " + t);
+            stopSelf();
+        }
+    }
+
+    private void doUpdate() {
         MediaMetadata.Builder mb = new MediaMetadata.Builder()
             .putString(MediaMetadata.METADATA_KEY_TITLE, title)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, channel)
@@ -297,9 +318,11 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.JavascriptInterface;
+import android.widget.Toast;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private boolean linked = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -317,6 +340,15 @@ public class MainActivity extends BridgeActivity {
             getBridge().getWebView().addJavascriptInterface(new Object() {
                 @JavascriptInterface
                 public void meta(String title, String channel, String id) {
+                    if (!linked) {
+                        linked = true;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "Lecteur : liaison OK", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
                     KeepAliveService.setMeta(title, channel, id);
                 }
 

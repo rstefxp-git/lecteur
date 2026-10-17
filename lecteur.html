@@ -156,7 +156,7 @@ function play(i,start){
   cur=i;const v=view[i];curId=v.id;st=-1;tcur=0;tdur=0;bgMeta(v);
   try{localStorage.setItem('last',v.id)}catch{}
   if(ready&&!start){cmd('loadVideoById',[v.id]);poster(v.id)}   /* lecteur déjà chargé : changement quasi instantané */
-  else{ready=false;$('#v').src=`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=${start?0:1}&rel=0&playsinline=1&enablejsapi=1`}
+  else{ready=false;$('#v').src=`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=${start?0:1}&rel=0&playsinline=1&enablejsapi=1${/^https?:/.test(location.protocol)?'&origin='+encodeURIComponent(location.origin):''}`}
   document.querySelectorAll('.card.on').forEach(c=>c.classList.remove('on'));
   const c=$(`.card[data-i="${i}"]`);if(c)c.classList.add('on');
   $('#mc').hidden=false;
