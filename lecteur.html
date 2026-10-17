@@ -130,6 +130,7 @@ new IntersectionObserver(e=>{if(e[0].isIntersecting)more()},{root:$('#menu'),roo
 /* lecture */
 let st=-1,menuOpen=false,ready=false,posterT;
 const menu=$('#menu');
+function bg(p){try{if(window.NativeBg)NativeBg.playing(p)}catch{}}   /* APK : service de lecture écran éteint */
 function cmd(f,a){try{$('#v').contentWindow.postMessage(JSON.stringify({event:'command',func:f,args:a||[]}),'*')}catch{}}
 function poster(id){const p=$('#po');p.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';p.hidden=false;clearTimeout(posterT);posterT=setTimeout(()=>{p.hidden=true},4000)}
 function openMenu(){
@@ -155,7 +156,7 @@ function play(i,start){
 $('#v').addEventListener('load',()=>{try{$('#v').contentWindow.postMessage(JSON.stringify({event:'listening',id:1}),'*')}catch{}});
 addEventListener('message',e=>{
   if(!/youtube/.test(e.origin))return;
-  try{const d=JSON.parse(e.data);ready=true;if(d.event==='onStateChange'){st=d.info;if(st===1)$('#po').hidden=true;if(st===0)play(cur+1)}}catch{}
+  try{const d=JSON.parse(e.data);ready=true;if(d.event==='onStateChange'){st=d.info;if(st===1){$('#po').hidden=true;bg(true)}else if(st===2)bg(false);if(st===0){if(cur+1>=view.length)bg(false);play(cur+1)}}}catch{}
 });
 addEventListener('popstate',()=>{if(menuOpen){menuOpen=false;menu.classList.add('out')}});
 
